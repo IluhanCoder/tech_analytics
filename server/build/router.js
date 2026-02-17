@@ -1,0 +1,32 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+var express_1 = require("express");
+var product_controller_1 = __importDefault(require("./product/product-controller"));
+var auth_controller_1 = __importDefault(require("./user/auth-controller"));
+var multer_1 = __importDefault(require("multer"));
+var auth_middleware_1 = __importDefault(require("./user/auth-middleware"));
+var transaction_controller_1 = __importDefault(require("./transactions/transaction-controller"));
+var analytics_controller_1 = __importDefault(require("./analytics/analytics-controller"));
+var router = (0, express_1.Router)();
+var upload = (0, multer_1.default)();
+router.get('/', function (req, res) {
+    return res.send("get success");
+});
+router.post('/', auth_controller_1.default.userVerification);
+router.post('/signup', auth_controller_1.default.signup);
+router.post('/login', auth_controller_1.default.login);
+router.post('/product', auth_middleware_1.default, upload.single("file"), product_controller_1.default.createProduct);
+router.get('/product', auth_middleware_1.default, product_controller_1.default.fetchProducts);
+router.put('/product/:productId', auth_middleware_1.default, product_controller_1.default.updateProduct);
+router.delete('/product/:productId', auth_middleware_1.default, product_controller_1.default.deleteProduct);
+router.post('/filter-products', auth_middleware_1.default, product_controller_1.default.filterProducts);
+router.post('/transaction', auth_middleware_1.default, transaction_controller_1.default.createTransaction);
+router.get('/transactions', auth_middleware_1.default, transaction_controller_1.default.fetchTransactions);
+router.put('/transaction/:transactionId', auth_middleware_1.default, transaction_controller_1.default.updateTransaction);
+router.delete('/transaction/:transactionId', auth_middleware_1.default, transaction_controller_1.default.deleteTransaction);
+router.post('/filter-transactions', auth_middleware_1.default, transaction_controller_1.default.filterTransactions);
+router.post('/apriori', auth_middleware_1.default, analytics_controller_1.default.transactionsApriori);
+exports.default = router;
