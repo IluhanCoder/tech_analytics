@@ -1,0 +1,1 @@
+export const inputStyle = "appearance-none w-full px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-200 focus:border-amber-300 transition text-sm shadow-sm";
