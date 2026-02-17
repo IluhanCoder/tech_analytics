@@ -14,6 +14,7 @@ import AnalyticsPage from "./analytics/analytics-page";
 import AnalyticsCategoriesPage from "./analytics/analytics-categories-page";
 import PredictionPage from "./prediction/prediction-page";
 import PairsPage from "./pairs/pairs-page";
+import PrivateRoute from "./components/PrivateRoute";
 import { useEffect } from "react";
 import { setHeader } from "./axios-setup";
 registerLocale("ua", uk);
@@ -77,14 +78,70 @@ function App() {
           <Route index element={<WelcomePage />} />
           <Route path="signup" element={<SignupPage />} />
           <Route path="login" element={<LoginPage />} />
-          <Route path="products" element={<ProductsPage />} />
-          <Route path="new-product" element={<NewProductPage />} />
-          <Route path="new-transaction" element={<NewTransactionPage />} />
-          <Route path="transactions" element={<TransactionsPage />} />
-          <Route path="analytics" element={<AnalyticsPage />} />
-          <Route path="analytics-categories" element={<AnalyticsCategoriesPage />} />
-          <Route path="prediction" element={<PredictionPage />} />
-          <Route path="pairs" element={<PairsPage />} />
+          <Route
+            path="products"
+            element={
+              <PrivateRoute>
+                <ProductsPage />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="new-product"
+            element={
+              <PrivateRoute>
+                <NewProductPage />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="new-transaction"
+            element={
+              <PrivateRoute>
+                <NewTransactionPage />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="transactions"
+            element={
+              <PrivateRoute>
+                <TransactionsPage />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="analytics"
+            element={
+              <PrivateRoute>
+                <AnalyticsPage />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="analytics-categories"
+            element={
+              <PrivateRoute>
+                <AnalyticsCategoriesPage />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="prediction"
+            element={
+              <PrivateRoute>
+                <PredictionPage />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="pairs"
+            element={
+              <PrivateRoute>
+                <PairsPage />
+              </PrivateRoute>
+            }
+          />
         </Routes>
       </AppLayout>
     </BrowserRouter>
