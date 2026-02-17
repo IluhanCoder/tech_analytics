@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import UnifiedLoadingScreen from "./UnifiedLoadingScreen";
-import $api from "../axios-setup";
+import $api, { setHeader } from "../axios-setup";
 
 interface PrivateRouteProps {
   children: React.ReactNode;
@@ -19,6 +19,7 @@ const PrivateRoute: React.FC<PrivateRouteProps> = ({ children }) => {
       }
 
       try {
+        setHeader();
         await $api.post("/", { token });
         setIsAuthenticated(true);
       } catch (error) {

@@ -1,148 +1,392 @@
 "use strict";
-var __assign = (this && this.__assign) || function () {
-    __assign = Object.assign || function(t) {
-        for (var s, i = 1, n = arguments.length; i < n; i++) {
-            s = arguments[i];
-            for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p))
-                t[p] = s[p];
-        }
-        return t;
-    };
-    return __assign.apply(this, arguments);
-};
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
-var __generator = (this && this.__generator) || function (thisArg, body) {
-    var _ = { label: 0, sent: function() { if (t[0] & 1) throw t[1]; return t[1]; }, trys: [], ops: [] }, f, y, t, g;
-    return g = { next: verb(0), "throw": verb(1), "return": verb(2) }, typeof Symbol === "function" && (g[Symbol.iterator] = function() { return this; }), g;
-    function verb(n) { return function (v) { return step([n, v]); }; }
-    function step(op) {
-        if (f) throw new TypeError("Generator is already executing.");
-        while (g && (g = 0, op[0] && (_ = 0)), _) try {
-            if (f = 1, y && (t = op[0] & 2 ? y["return"] : op[0] ? y["throw"] || ((t = y["return"]) && t.call(y), 0) : y.next) && !(t = t.call(y, op[1])).done) return t;
-            if (y = 0, t) op = [op[0] & 2, t.value];
-            switch (op[0]) {
-                case 0: case 1: t = op; break;
-                case 4: _.label++; return { value: op[1], done: false };
-                case 5: _.label++; y = op[1]; op = [0]; continue;
-                case 7: op = _.ops.pop(); _.trys.pop(); continue;
-                default:
-                    if (!(t = _.trys, t = t.length > 0 && t[t.length - 1]) && (op[0] === 6 || op[0] === 2)) { _ = 0; continue; }
-                    if (op[0] === 3 && (!t || (op[1] > t[0] && op[1] < t[3]))) { _.label = op[1]; break; }
-                    if (op[0] === 6 && _.label < t[1]) { _.label = t[1]; t = op; break; }
-                    if (t && _.label < t[2]) { _.label = t[2]; _.ops.push(op); break; }
-                    if (t[2]) _.ops.pop();
-                    _.trys.pop(); continue;
-            }
-            op = body.call(thisArg, _);
-        } catch (e) { op = [6, e]; y = 0; } finally { f = t = 0; }
-        if (op[0] & 5) throw op[1]; return { value: op[0] ? op[1] : void 0, done: true };
-    }
-};
-var __spreadArray = (this && this.__spreadArray) || function (to, from, pack) {
-    if (pack || arguments.length === 2) for (var i = 0, l = from.length, ar; i < l; i++) {
-        if (ar || !(i in from)) {
-            if (!ar) ar = Array.prototype.slice.call(from, 0, i);
-            ar[i] = from[i];
-        }
-    }
-    return to.concat(ar || Array.prototype.slice.call(from));
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.default = new /** @class */ (function () {
-    function AnalyticsService() {
-    }
-    AnalyticsService.prototype.transactionsApriori = function (transactions) {
-        return __awaiter(this, void 0, void 0, function () {
-            function fetchTransactions() {
-                return __awaiter(this, void 0, void 0, function () {
-                    var transactionData;
-                    return __generator(this, function (_a) {
-                        transactionData = [];
-                        transactions.forEach(function (transaction) {
-                            var items = transaction.products.map(function (product) { return product.product.id; });
-                            transactionData.push(items);
-                        });
-                        return [2 /*return*/, transactionData];
+const transaction_service_1 = __importDefault(require("../transactions/transaction-service"));
+const simple_statistics_1 = __importDefault(require("simple-statistics"));
+const prisma_client_1 = __importDefault(require("../prisma-client"));
+const analytics_helpers_1 = require("./analytics-helpers");
+exports.default = new class AnalyticsService {
+    async transactionsApriori(minSupport, maxSupport, minConfidence, maxConfidence, category) {
+        const transactions = await prisma_client_1.default.transaction.findMany({
+            select: {
+                id: true,
+                date: true,
+                products: {
+                    select: {
+                        id: true,
+                        quantity: true,
+                        product: {
+                            select: {
+                                id: true,
+                                name: true,
+                                category: true,
+                                description: true,
+                                price: true,
+                            },
+                        },
+                    },
+                },
+            },
+        });
+        async function fetchTransactions() {
+            const transactionData = [];
+            transactions.forEach((transaction) => {
+                let items = transaction.products.filter((product) => { if (!product.product)
+                    return false;
+                else
+                    return !category || product.product.category === category; });
+                items = items.map((product) => { if (product.product)
+                    return product.product.id; });
+                if (items.length > 0)
+                    transactionData.push(items);
+            });
+            return transactionData;
+        }
+        async function findFrequentPairs(data, minSupport, minConfidence, maxSupport, maxConfidence) {
+            // Step 1: Count item frequencies
+            const itemFrequencies = new Map();
+            for (const transaction of data) {
+                for (const item of transaction) {
+                    if (!itemFrequencies.has(item)) {
+                        itemFrequencies.set(item, 0);
+                    }
+                    itemFrequencies.set(item, itemFrequencies.get(item) + 1);
+                }
+            }
+            // Step 2: Generate frequent pairs (itemsets of size 2)
+            const frequentPairs = [];
+            for (const item1 of itemFrequencies.keys()) {
+                if (itemFrequencies.get(item1) >= minSupport && itemFrequencies.get(item1) <= maxSupport) {
+                    for (const item2 of itemFrequencies.keys()) {
+                        if (item1 !== item2 && itemFrequencies.get(item2) >= minSupport && itemFrequencies.get(item2) <= maxSupport) {
+                            frequentPairs.push([item1, item2]);
+                        }
+                    }
+                }
+            }
+            // Step 3: Calculate support for frequent pairs
+            const pairSupport = new Map();
+            for (const transaction of data) {
+                for (const pair of frequentPairs) {
+                    if (transaction.includes(pair[0]) && transaction.includes(pair[1])) {
+                        if (!pairSupport.has(pair)) {
+                            pairSupport.set(pair, 0);
+                        }
+                        pairSupport.set(pair, pairSupport.get(pair) + 1);
+                    }
+                }
+            }
+            // Step 4: Generate association rules and calculate confidence
+            const frequentPairsWithInfo = [];
+            for (const pair of frequentPairs) {
+                const support = pairSupport.get(pair);
+                const confidence = support / itemFrequencies.get(pair[0]);
+                if (confidence >= minConfidence && confidence <= maxConfidence) {
+                    frequentPairsWithInfo.push({
+                        pair,
+                        support,
+                        confidence,
                     });
+                }
+            }
+            // Step 5: Sort the rules by support and confidence
+            frequentPairsWithInfo.sort((a, b) => {
+                if (a.support !== b.support) {
+                    return b.support - a.support;
+                }
+                return b.confidence - a.confidence;
+            });
+            let result = [];
+            const getProductData = async (fp) => {
+                const pair = fp.pair;
+                const product1 = await prisma_client_1.default.product.findUnique({ where: { id: pair[0] } });
+                const product2 = await prisma_client_1.default.product.findUnique({ where: { id: pair[1] } });
+                const newData = {
+                    pair: [
+                        product1,
+                        product2
+                    ],
+                    support: fp.support,
+                    confidence: fp.confidence
+                };
+                result = [...result, newData];
+            };
+            await Promise.all(frequentPairsWithInfo.map(async (fp) => await getProductData(fp)));
+            return result;
+        }
+        const dataset = await fetchTransactions();
+        const frequentPairs = await findFrequentPairs(dataset, minSupport, minConfidence, maxSupport, maxConfidence);
+        return (frequentPairs);
+    }
+    async predictSales(productId, monthToPredict) {
+        const fetchHistoricalSales = async (productId) => {
+            return await transaction_service_1.default.fetchRangeSales(productId);
+        };
+        async function predictMonthlyProductSales(productId, monthsToPredict) {
+            // Fetch historical sales data for the specified product
+            const historicalSales = await fetchHistoricalSales(productId);
+            // Extract sales data into arrays
+            const months = historicalSales.map((entry) => entry.month);
+            const sales = historicalSales.map((entry) => entry.sales);
+            // Create a regression model
+            const monthIndexes = months.map((month) => Number(month.slice(-2)));
+            const dataToLearn = monthIndexes.map((index, i = 0) => [index, sales[i++]]);
+            const regressionModel = simple_statistics_1.default.linearRegression(dataToLearn);
+            // Predict sales for future months
+            const predictedSales = [];
+            for (let i = 0; i < monthsToPredict; i++) {
+                const nextMonthIndex = months.length + i + 1;
+                const nextMonth = new Date();
+                nextMonth.setMonth(nextMonth.getMonth() + i + 1);
+                const predictedSale = regressionModel.m * nextMonthIndex + regressionModel.b;
+                predictedSales.push({
+                    month: formatDate(nextMonth),
+                    sales: Math.max(0, predictedSale), // Ensure predictions are non-negative
                 });
             }
-            function generateCandidates(itemSets) {
-                var candidates = [];
-                // Generate candidate item sets
-                for (var i = 0; i < itemSets.length; i++) {
-                    for (var j = i + 1; j < itemSets.length; j++) {
-                        var mergedItems = __spreadArray(__spreadArray([], itemSets[i].items, true), itemSets[j].items, true);
-                        var uniqueItems = Array.from(new Set(mergedItems)); // Remove duplicates
-                        candidates.push({ items: uniqueItems, support: 0, confidence: 0 });
-                    }
-                }
-                return candidates;
+            function formatDate(date) {
+                const year = date.getFullYear();
+                const month = (date.getMonth() + 1).toString().padStart(2, '0');
+                return `${year}-${month}`;
             }
-            function calculateSupportAndConfidence(transactions, itemSets, minConfidence, maxConfidence) {
-                var _a;
-                for (var _i = 0, transactions_1 = transactions; _i < transactions_1.length; _i++) {
-                    var transaction = transactions_1[_i];
-                    var _loop_1 = function (candidate) {
-                        if (transaction.every(function (item) { return candidate.items.includes(item); })) {
-                            candidate.support++;
-                            var antecedentSupport = (_a = itemSets.find(function (itemSet) {
-                                return itemSet.items.length === 1 &&
-                                    itemSet.items[0] === candidate.items[0];
-                            })) === null || _a === void 0 ? void 0 : _a.support;
-                            if (antecedentSupport) {
-                                candidate.confidence = candidate.support / antecedentSupport;
-                            }
-                        }
-                    };
-                    for (var _b = 0, itemSets_1 = itemSets; _b < itemSets_1.length; _b++) {
-                        var candidate = itemSets_1[_b];
-                        _loop_1(candidate);
+            return predictedSales;
+        }
+        return predictMonthlyProductSales(productId, monthToPredict);
+    }
+    async monthlyTransactions(startMonth, endMonth) {
+        async function getMonthlyTransactionInfo(startMonth, endMonth) {
+            const transactions = await prisma_client_1.default.transaction.findMany({
+                select: {
+                    date: true,
+                },
+                where: {
+                    date: {
+                        gte: new Date(startMonth),
+                        lte: new Date((0, analytics_helpers_1.incrementDateByOneMonth)(endMonth)),
+                    },
+                },
+            });
+            const monthlyInfoMap = {};
+            transactions.forEach((transaction) => {
+                if (transaction.date) {
+                    const monthYear = transaction.date.toISOString().slice(0, 7); // Extract YYYY-MM from the date
+                    if (monthlyInfoMap[monthYear]) {
+                        monthlyInfoMap[monthYear]++;
                     }
-                }
-                return itemSets.filter(function (candidate) {
-                    return candidate.support > 0 &&
-                        candidate.confidence >= minConfidence &&
-                        candidate.confidence <= maxConfidence;
-                });
-            }
-            function findFrequentCouplesWithConfidence(transactions, minSupport, maxSupport, minConfidence, maxConfidence) {
-                var itemSets = transactions
-                    .flat()
-                    .map(function (item) { return ({ items: [item], support: 0, confidence: 0 }); });
-                var frequentCouples = [];
-                while (itemSets.length > 0) {
-                    itemSets = calculateSupportAndConfidence(transactions, itemSets, minConfidence, maxConfidence);
-                    for (var _i = 0, itemSets_2 = itemSets; _i < itemSets_2.length; _i++) {
-                        var itemSet = itemSets_2[_i];
-                        var support = itemSet.support / transactions.length;
-                        if (support >= minSupport && support <= maxSupport) {
-                            frequentCouples.push(__assign(__assign({}, itemSet), { support: support }));
-                        }
+                    else {
+                        monthlyInfoMap[monthYear] = 1;
                     }
-                    itemSets = generateCandidates(itemSets);
-                }
-                return frequentCouples;
-            }
-            var fetchedTransactions, result;
-            return __generator(this, function (_a) {
-                switch (_a.label) {
-                    case 0:
-                        return [4 /*yield*/, fetchTransactions()];
-                    case 1:
-                        fetchedTransactions = _a.sent();
-                        result = findFrequentCouplesWithConfidence(fetchedTransactions, 0.1, 0.9, 0.1, 0.9);
-                        return [2 /*return*/, result];
                 }
             });
-        });
-    };
-    return AnalyticsService;
-}());
+            const monthlyTransactionInfo = [];
+            for (const monthYear in monthlyInfoMap) {
+                monthlyTransactionInfo.push({
+                    month: monthYear,
+                    transactions: monthlyInfoMap[monthYear],
+                });
+            }
+            function compareMonths(a, b) {
+                if (a.month < b.month) {
+                    return -1;
+                }
+                if (a.month > b.month) {
+                    return 1;
+                }
+                return 0;
+            }
+            monthlyTransactionInfo.sort(compareMonths);
+            return (0, analytics_helpers_1.fillMissingMonths)(monthlyTransactionInfo, "monthlyTransactions", startMonth, endMonth);
+        }
+        return await getMonthlyTransactionInfo(startMonth, endMonth);
+    }
+    async averageTransaction(startMonth, endMonth) {
+        async function getMonthlyAverageTransactionCost(startMonth, endMonth) {
+            const monthlyData = {};
+            const transactions = await prisma_client_1.default.transaction.findMany({
+                select: {
+                    date: true,
+                    products: {
+                        select: {
+                            quantity: true,
+                            product: {
+                                select: {
+                                    price: true,
+                                },
+                            },
+                        },
+                    },
+                },
+                where: {
+                    date: {
+                        gte: new Date(startMonth),
+                        lte: new Date((0, analytics_helpers_1.incrementDateByOneMonth)(endMonth)),
+                    },
+                },
+            });
+            transactions.forEach((transaction) => {
+                if (transaction.date) {
+                    const monthYear = transaction.date.toISOString().slice(0, 7);
+                    if (!monthlyData[monthYear]) {
+                        monthlyData[monthYear] = { totalCost: 0, transactionCount: 0 };
+                    }
+                    const transactionCost = transaction.products.reduce((acc, product) => {
+                        if (product.product && product.quantity) {
+                            return acc + product.product.price * product.quantity;
+                        }
+                        return acc;
+                    }, 0);
+                    monthlyData[monthYear].totalCost += transactionCost;
+                    monthlyData[monthYear].transactionCount += 1;
+                }
+            });
+            const monthlyAverageCost = [];
+            for (const monthYear in monthlyData) {
+                const { totalCost, transactionCount } = monthlyData[monthYear];
+                const averageCost = transactionCount === 0 ? 0 : totalCost / transactionCount;
+                monthlyAverageCost.push({
+                    month: monthYear,
+                    averageCost,
+                });
+            }
+            function compareMonths(a, b) {
+                if (a.month < b.month) {
+                    return -1;
+                }
+                if (a.month > b.month) {
+                    return 1;
+                }
+                return 0;
+            }
+            monthlyAverageCost.sort(compareMonths);
+            return (0, analytics_helpers_1.fillMissingMonths)(monthlyAverageCost, "averageTransaction", startMonth, endMonth);
+        }
+        return await getMonthlyAverageTransactionCost(startMonth, endMonth);
+    }
+    async monthlyTransactionSum(startMonth, endMonth) {
+        async function getMonthlyTransactionCosts(startMonth, endMonth) {
+            const transactions = await prisma_client_1.default.transaction.findMany({
+                select: {
+                    date: true,
+                    products: {
+                        select: {
+                            quantity: true,
+                            product: {
+                                select: {
+                                    price: true,
+                                },
+                            },
+                        },
+                    },
+                },
+                where: {
+                    date: {
+                        gte: new Date(startMonth),
+                        lte: new Date((0, analytics_helpers_1.incrementDateByOneMonth)(endMonth)),
+                    },
+                },
+            });
+            const monthlyData = {};
+            transactions.forEach((transaction) => {
+                if (transaction.date) {
+                    const monthYear = transaction.date.toISOString().slice(0, 7);
+                    const transactionCost = transaction.products.reduce((acc, product) => {
+                        if (product.product && product.quantity) {
+                            return acc + product.product.price * product.quantity;
+                        }
+                        return acc;
+                    }, 0);
+                    if (!monthlyData[monthYear]) {
+                        monthlyData[monthYear] = transactionCost;
+                    }
+                    else {
+                        monthlyData[monthYear] += transactionCost;
+                    }
+                }
+            });
+            const monthlyTransactionCosts = [];
+            for (const monthYear in monthlyData) {
+                monthlyTransactionCosts.push({
+                    month: monthYear,
+                    transactionCostsSum: monthlyData[monthYear],
+                });
+            }
+            function compareMonths(a, b) {
+                if (a.month < b.month) {
+                    return -1;
+                }
+                if (a.month > b.month) {
+                    return 1;
+                }
+                return 0;
+            }
+            // Sort the array by month
+            monthlyTransactionCosts.sort(compareMonths);
+            return (0, analytics_helpers_1.fillMissingMonths)(monthlyTransactionCosts, "monthlyTransactionSum", startMonth, endMonth);
+        }
+        return getMonthlyTransactionCosts(startMonth, endMonth);
+    }
+    async monthlyProductSales(productId) {
+        async function getMonthlyProductSales(productId) {
+            const currentDate = new Date();
+            const currentYear = currentDate.getFullYear().toString();
+            const startMonth = currentYear + '-01-01';
+            const endMonth = currentYear + '-12-31';
+            const transactions = await prisma_client_1.default.transaction.findMany({
+                select: {
+                    date: true,
+                    products: {
+                        select: {
+                            productId: true,
+                            quantity: true,
+                        },
+                    },
+                },
+                where: {
+                    date: {
+                        gte: new Date(startMonth),
+                        lte: new Date((0, analytics_helpers_1.incrementDateByOneMonth)(endMonth))
+                    }
+                }
+            });
+            const monthlyData = {};
+            transactions.forEach((transaction) => {
+                if (transaction.date) {
+                    const monthYear = transaction.date.toISOString().slice(0, 7);
+                    const productSale = transaction.products.reduce((acc, product) => {
+                        if (product.productId === productId && product.quantity) {
+                            return acc + product.quantity;
+                        }
+                        return acc;
+                    }, 0);
+                    if (!monthlyData[monthYear]) {
+                        monthlyData[monthYear] = productSale;
+                    }
+                    else {
+                        monthlyData[monthYear] += productSale;
+                    }
+                }
+            });
+            const monthlyProductSales = [];
+            for (const monthYear in monthlyData) {
+                monthlyProductSales.push({
+                    month: monthYear,
+                    productSales: monthlyData[monthYear],
+                });
+            }
+            function compareMonths(a, b) {
+                if (a.month < b.month) {
+                    return -1;
+                }
+                if (a.month > b.month) {
+                    return 1;
+                }
+                return 0;
+            }
+            monthlyProductSales.sort(compareMonths);
+            return (0, analytics_helpers_1.fillMissingMonths)(monthlyProductSales, "monthlyProductSales", startMonth.slice(0, -3), endMonth.slice(0, -3));
+        }
+        return await getMonthlyProductSales(productId);
+    }
+};

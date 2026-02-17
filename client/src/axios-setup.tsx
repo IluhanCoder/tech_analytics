@@ -9,7 +9,9 @@ const $api = axios.create({
 
 export function setHeader() {
   const token = localStorage.getItem("token");
-  $api.defaults.headers.common['Authorization'] = token;
+  if (token) {
+    $api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+  }
 }
 
 export function dropHeader() {
