@@ -47,8 +47,7 @@ const LoginPage = () => {
       const token = (await $api.post("/login", inputValue)).data;
       localStorage.setItem("token", token);
       setHeader();
-      toast.success("Успішний вхід! Перенаправляння...");
-      setTimeout(() => navigate("/"), 1500);
+      navigate("/products");
     } catch(error: any) {
       const errorMsg = error.response?.data?.message || error.message || "Помилка входу";
       toast.error(errorMsg);
